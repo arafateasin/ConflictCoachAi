@@ -8,9 +8,12 @@ import { ScoreCard } from "@/components/ScoreCard";
 import { FeedbackBox } from "@/components/FeedbackBox";
 import { TranscriptViewer } from "@/components/TranscriptViewer";
 import { WaveformBackground } from "@/components/WaveformBackground";
+import { DynamicBackground } from "@/components/DynamicBackground";
+import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
+import { StressMeter } from "@/components/StressMeter";
 import { ArrowLeft, RotateCcw, Headphones, Shield, Zap } from "lucide-react";
 
-type AppState = "selection" | "simulation" | "analysis";
+type CallStatus = "IDLE" | "INCOMING" | "ACTIVE" | "FEEDBACK";
 
 const scenarios: Scenario[] = [
   {
@@ -80,26 +83,27 @@ const sampleFeedback = [
 ];
 
 const Index = () => {
-  const [appState, setAppState] = useState<AppState>("selection");
+  const [callStatus, setCallStatus] = useState<CallStatus>("IDLE");
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [timer, setTimer] = useState(0);
   const [agentStatus, setAgentStatus] = useState<"angry" | "listening" | "calm">("listening");
+  const [stressLevel, setStressLevel] = useState(75);
 
   // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (appState === "simulation") {
+    if (callStatus === "ACTIVE") {
       interval = setInterval(() => {
         setTimer((prev) => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [appState]);
+  }, [callStatus]);
 
-  // Simulate agent status changes
+  // Simulate agent status and stress level changes
   useEffect(() => {
-    if (appState === "simulation") {
+    if (callStatus === "ACTIVE") {
       const statusCycle = setInterval(() => {
         setAgentStatus((prev) => {
           const states: ("angry" | "listening" | "calm")[] = ["angry", "listening", "calm", "angry", "angry", "listening"];
@@ -107,9 +111,22 @@ const Index = () => {
           return states[(currentIndex + 1) % states.length];
         });
       }, 3000);
-      return () => clearInterval(statusCycle);
+
+      // Update stress based on agent status
+      const stressUpdate = setInterval(() => {
+        setStressLevel((prev) => {
+          if (agentStatus === "angry") return Math.min(100, prev + 5);
+          if (agentStatus === "calm") return Math.max(20, prev - 10);
+          return prev + (Math.random() - 0.5) * 10;
+        });
+      }, 1000);
+
+      return () => {
+        clearInterval(statusCycle);
+        clearInterval(stressUpdate);
+      };
     }
-  }, [appState]);
+  }, [callStatus, agentStatus]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -119,35 +136,51 @@ const Index = () => {
 
   const handleSelectScenario = (scenario: Scenario) => {
     setSelectedScenario(scenario);
-    setAppState("simulation");
+    setCallStatus("INCOMING");
+  };
+
+  const handleAcceptCall = () => {
+    setCallStatus("ACTIVE");
     setTimer(0);
     setAgentStatus("angry");
+    setStressLevel(75);
+  };
+
+  const handleDeclineCall = () => {
+    setCallStatus("IDLE");
+    setSelectedScenario(null);
   };
 
   const handleEndCall = () => {
-    setAppState("analysis");
+    setCallStatus("FEEDBACK");
   };
 
   const handleRetry = () => {
-    setAppState("simulation");
+    setCallStatus("INCOMING");
     setTimer(0);
     setAgentStatus("angry");
+    setStressLevel(75);
   };
 
   const handleBackToMenu = () => {
-    setAppState("selection");
+    setCallStatus("IDLE");
     setSelectedScenario(null);
     setTimer(0);
   };
 
   return (
     <div className="min-h-screen relative">
-      <WaveformBackground />
+      {/* Background - Dynamic during call, Waveform otherwise */}
+      {callStatus === "ACTIVE" ? (
+        <DynamicBackground stressLevel={stressLevel} />
+      ) : (
+        <WaveformBackground />
+      )}
       
       <div className="relative z-10">
         <AnimatePresence mode="wait">
-          {/* State 1: Scenario Selection */}
-          {appState === "selection" && (
+          {/* State 1: Scenario Selection (IDLE) */}
+          {callStatus === "IDLE" && (
             <motion.div
               key="selection"
               initial={{ opacity: 0 }}
@@ -207,7 +240,7 @@ const Index = () => {
           )}
 
           {/* State 2: Active Simulation */}
-          {appState === "simulation" && selectedScenario && (
+          {callStatus === "ACTIVE" && selectedScenario && (
             <motion.div
               key="simulation"
               initial={{ opacity: 0 }}
@@ -233,6 +266,9 @@ const Index = () => {
                   <div className="w-20" />
                 </motion.div>
               </div>
+
+              {/* Stress Meter */}
+              <StressMeter baseLevel={stressLevel} />
 
               {/* Main Content */}
               <div className="flex-1 flex flex-col items-center justify-center px-4 pb-32">
@@ -287,8 +323,8 @@ const Index = () => {
             </motion.div>
           )}
 
-          {/* State 3: Post-Call Analysis */}
-          {appState === "analysis" && selectedScenario && (
+          {/* State 3: Post-Call Analysis (FEEDBACK) */}
+          {callStatus === "FEEDBACK" && selectedScenario && (
             <motion.div
               key="analysis"
               initial={{ opacity: 0 }}
@@ -342,9 +378,9 @@ const Index = () => {
                 <FeedbackBox feedback={sampleFeedback} />
               </div>
 
-              {/* Transcript */}
+              {/* Transcript with sentiment highlighting */}
               <div className="mb-8">
-                <TranscriptViewer messages={sampleTranscript} />
+                <TranscriptViewer messages={sampleTranscript} showSentiment={true} />
               </div>
 
               {/* Action Buttons */}
@@ -364,6 +400,17 @@ const Index = () => {
                 </Button>
               </motion.div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Incoming Call Overlay */}
+        <AnimatePresence>
+          {callStatus === "INCOMING" && selectedScenario && (
+            <IncomingCallOverlay
+              scenarioTitle={selectedScenario.title}
+              onAccept={handleAcceptCall}
+              onDecline={handleDeclineCall}
+            />
           )}
         </AnimatePresence>
       </div>
