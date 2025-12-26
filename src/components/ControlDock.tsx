@@ -17,7 +17,7 @@ export function ControlDock({ isMuted, onToggleMute, onEndCall, timer }: Control
       transition={{ duration: 0.4, delay: 0.2 }}
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
     >
-      <div className="flex items-center gap-4 bg-card/90 backdrop-blur-xl border border-border rounded-2xl p-3 shadow-2xl">
+      <div className="flex items-center gap-4 bg-card/30 backdrop-blur-xl border border-foreground/10 rounded-2xl p-3 shadow-2xl">
         {/* Timer */}
         <div className="px-4 py-2 bg-secondary/50 rounded-xl min-w-[80px] text-center">
           <span className="font-mono text-lg font-semibold text-foreground">{timer}</span>
