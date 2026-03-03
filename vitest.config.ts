@@ -30,14 +30,15 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
       "@/components": path.resolve(__dirname, "./src/components"),
+      "@/hooks": path.resolve(__dirname, "./src/hooks"),
       "@/lib": path.resolve(__dirname, "./lib"),
       "@/types": path.resolve(__dirname, "./types"),
       "@/config": path.resolve(__dirname, "./config"),
       "@/context": path.resolve(__dirname, "./context"),
-      "@/hooks": path.resolve(__dirname, "./src/hooks"),
       "@/app": path.resolve(__dirname, "./app"),
+      "@/src": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "./"),
     },
   },
 });

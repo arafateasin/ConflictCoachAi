@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -147,9 +147,44 @@ export function AchievementSystem({
     Achievement[]
   >([]);
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement | null>(null);
+  const prevUnlockedIdsRef = useRef<Set<string>>(new Set());
+  const onAchievementUnlockedRef = useRef(onAchievementUnlocked);
+
+  // Keep ref updated with latest callback
+  useEffect(() => {
+    onAchievementUnlockedRef.current = onAchievementUnlocked;
+  }, [onAchievementUnlocked]);
+
+  // Load persisted timestamps from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("achievement-timestamps");
+      if (stored) {
+        try {
+          const timestamps = JSON.parse(stored) as Record<string, string>;
+          prevUnlockedIdsRef.current = new Set(Object.keys(timestamps));
+        } catch (e) {
+          console.error("Failed to parse achievement timestamps", e);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const checkAchievements = () => {
+      // Load stored timestamps
+      let storedTimestamps: Record<string, string> = {};
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("achievement-timestamps");
+        if (stored) {
+          try {
+            storedTimestamps = JSON.parse(stored);
+          } catch (e) {
+            console.error("Failed to parse achievement timestamps", e);
+          }
+        }
+      }
+
       const unlocked = ACHIEVEMENTS.map((achievement) => {
         let isUnlocked = false;
         let progress = 0;
@@ -190,30 +225,62 @@ export function AchievementSystem({
             break;
         }
 
+        // Use stored timestamp if exists, otherwise create new one only on unlock
+        const wasUnlocked = prevUnlockedIdsRef.current.has(achievement.id);
+        let unlockedAt: Date | undefined = undefined;
+
+        if (isUnlocked) {
+          if (storedTimestamps[achievement.id]) {
+            unlockedAt = new Date(storedTimestamps[achievement.id]);
+          } else if (!wasUnlocked) {
+            // First time unlocking
+            unlockedAt = new Date();
+            storedTimestamps[achievement.id] = unlockedAt.toISOString();
+          } else {
+            unlockedAt = new Date();
+          }
+        }
+
         return {
           ...achievement,
-          unlockedAt: isUnlocked ? new Date() : undefined,
+          unlockedAt,
           progress: Math.min(progress, 100),
         };
       }).filter((a) => a.unlockedAt);
 
       // Check for newly unlocked achievements
-      const previouslyUnlocked = unlockedAchievements.map((a) => a.id);
-      const newUnlocked = unlocked.find(
-        (a) => !previouslyUnlocked.includes(a.id),
-      );
+      const newlyUnlockedIds = unlocked
+        .map((a) => a.id)
+        .filter((id) => !prevUnlockedIdsRef.current.has(id));
 
-      if (newUnlocked && onAchievementUnlocked) {
-        setNewlyUnlocked(newUnlocked);
-        onAchievementUnlocked(newUnlocked);
-        setTimeout(() => setNewlyUnlocked(null), 5000);
+      if (newlyUnlockedIds.length > 0) {
+        // Update stored timestamps
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "achievement-timestamps",
+            JSON.stringify(storedTimestamps),
+          );
+        }
+
+        // Notify about newly unlocked achievements
+        newlyUnlockedIds.forEach((id) => {
+          const achievement = unlocked.find((a) => a.id === id);
+          if (achievement && onAchievementUnlockedRef.current) {
+            setNewlyUnlocked(achievement);
+            onAchievementUnlockedRef.current(achievement);
+            setTimeout(() => setNewlyUnlocked(null), 5000);
+          }
+        });
+
+        // Update the ref
+        prevUnlockedIdsRef.current = new Set(unlocked.map((a) => a.id));
       }
 
       setUnlockedAchievements(unlocked);
     };
 
     checkAchievements();
-  }, [userStats, onAchievementUnlocked]);
+  }, [userStats]);
 
   const allAchievementsWithProgress = ACHIEVEMENTS.map((achievement) => {
     const unlocked = unlockedAchievements.find((a) => a.id === achievement.id);

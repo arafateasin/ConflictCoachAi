@@ -72,8 +72,10 @@ export function AnalyticsDashboard({
     const initialAvg =
       initialScores.reduce((a, b) => a + b, 0) / initialScores.length;
     const improvement =
-      initialScores.length > 0
+      initialScores.length > 0 && initialAvg !== 0
         ? ((recentAvg - initialAvg) / initialAvg) * 100
+        : initialScores.length > 0
+        ? recentAvg - initialAvg
         : 0;
 
     // Category averages
@@ -181,12 +183,15 @@ export function AnalyticsDashboard({
         </div>
         <Badge variant="outline" className="text-sm">
           <Calendar className="w-4 h-4 mr-2" />
-          Last{" "}
-          {timeframe === "week"
-            ? "7 days"
-            : timeframe === "month"
-            ? "30 days"
-            : "year"}
+          {timeframe === "all"
+            ? "All time"
+            : `Last ${
+                timeframe === "week"
+                  ? "7 days"
+                  : timeframe === "month"
+                  ? "30 days"
+                  : "year"
+              }`}
         </Badge>
       </div>
 

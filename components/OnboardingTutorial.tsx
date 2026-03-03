@@ -415,6 +415,8 @@ export function useTutorial() {
   const [showTutorial, setShowTutorial] = useState(false);
 
   const checkAndShowTutorial = () => {
+    if (typeof window === "undefined") return;
+
     const hasCompletedTutorial = localStorage.getItem(
       "conflictcoach-tutorial-completed",
     );
@@ -424,6 +426,8 @@ export function useTutorial() {
   };
 
   const resetTutorial = () => {
+    if (typeof window === "undefined") return;
+
     localStorage.removeItem("conflictcoach-tutorial-completed");
     setShowTutorial(true);
   };
